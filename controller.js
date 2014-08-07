@@ -1,0 +1,258 @@
+
+var app = angular.module('minesweeper', []);
+//Directive to handle right click
+app.directive('ngRightClick', function($parse) {
+    return function(scope, element, attrs) {
+        var fn = $parse(attrs.ngRightClick);
+        element.bind('contextmenu', function(event) {
+            scope.$apply(function() {
+                event.preventDefault();
+                fn(scope, {$event:event});
+            });
+        });
+    };
+});
+
+
+function MinesweeperController($scope){
+
+	$scope.minefield = createMinefield();
+	$scope.status = 'inGame'
+	$scope.winMessage = "You Won !!";
+	$scope.loseMessage = "You Lost !!";
+	$scope.leftMine = 10;
+	$scope.leftMineReal = 10;
+	
+	//When tile is flagged
+	$scope.flag = function(spot) {
+	
+		if(spot.isCovered && spot.content != 'flagged')
+		{
+			if( spot.content == 'mine')
+				$scope.leftMineReal --;
+			spot.content = 'flagged' ;
+			$scope.leftMine --;
+		}
+		else if(spot.isCovered && spot.content == 'flagged')
+		{
+			spot.content = spot.bkp ;
+			$scope.leftMine ++;
+			if( spot.content == 'mine')
+				$scope.leftMineReal ++;
+		}
+		
+		if( $scope.leftMineReal == 0)
+			$scope.status='win';
+		
+	};
+	// when tile is clicked
+	$scope.uncoverSpot = function(spot) {
+	
+		if(spot.isCovered && spot.content != 'flagged')
+		{
+			if(spot.content == 'mine')
+			{
+				spot.isCovered = false;
+				$scope.status = 'lost';
+			}
+			else if(spot.content == 'empty')
+			{
+				
+				flood($scope.minefield, spot.row, spot.column);
+			}
+			else
+			{
+				spot.isCovered = false;
+			}
+		}
+
+	};
+
+}
+//when empty tile is clicked, flood will reveled all the empty tile around it.
+function flood(minefield, row, column)
+{
+	var spot;
+	if( row >=0 && row < 9 && column >= 0 && column < 9 )
+	{
+		spot = getSpot(minefield, row, column);
+		if(spot.isCovered && spot.content != 'mine' && spot.content != 'flagged')	
+		{
+			spot.isCovered = false;
+			if(isNumber(spot.content))
+			{
+				return true;
+			}
+			else
+			{
+				flood(minefield, row-1, column-1);
+				flood(minefield, row-1, column);
+				flood(minefield, row-1, column+1);
+				
+				flood(minefield, row, column-1);
+				flood(minefield, row, column+1);
+				
+				flood(minefield, row+1, column-1);
+				flood(minefield, row+1, column);
+				flood(minefield, row+1, column+1);
+			}
+		}
+		else
+			return true;
+	}
+	else
+		return true;
+				
+}
+
+function calculateAllNumbers(minefield) {
+    for(var y = 0; y < 9; y++) {
+        for(var x = 0; x < 9; x++) {
+			 calculateNumber(minefield, x, y);
+        }
+    }
+}
+
+function calculateNumber(minefield, row, column) {
+ 
+ var thisSpot = getSpot(minefield, row, column);
+    
+    // if this spot contains a mine then we can't place a number here
+    if(thisSpot.content == "mine") {
+        return;
+    }
+    
+    var mineCount = 0;
+
+    // check row above if this is not the first row
+    if(row > 0) 
+	{
+        // check column to the left if this is not the first column
+        if(column > 0) {
+            // get the spot above and to the left
+            var spot = getSpot(minefield, row - 1, column - 1);
+            if(spot.content == "mine") {
+                mineCount++;
+            }
+        }
+
+        // get the spot right above
+        var spot = getSpot(minefield, row - 1, column);
+        if(spot.content == "mine") {
+            mineCount++;
+        }
+
+        // check column to the right if this is not the last column
+        if(column < 8) {
+            // get the spot above and to the right
+            var spot = getSpot(minefield, row - 1, column + 1);
+            if(spot.content == "mine") {
+                mineCount++;
+            }
+        }
+    }
+
+    // check column to the left if this is not the first column
+    if(column > 0) {
+        // get the spot to the left
+        var spot = getSpot(minefield, row, column - 1);
+        if(spot.content == "mine") {
+            mineCount++;
+        }
+    }
+    
+    // check column to the right if this is not the last column
+    if(column < 8) {
+        // get the spot to the right
+        var spot = getSpot(minefield, row, column + 1);
+        if(spot.content == "mine") {
+            mineCount++;
+        }
+    }
+
+    // check row below if this is not the last row
+    if(row < 8) {
+        // check column to the left if this is not the first column
+        if(column > 0) {
+            // get the spot below and to the left
+            var spot = getSpot(minefield, row + 1, column - 1);
+            if(spot.content == "mine") {
+                mineCount++;
+            }
+        }
+
+        // get the spot right below
+        var spot = getSpot(minefield, row + 1, column);
+        if(spot.content == "mine") {
+            mineCount++;
+        }
+
+        // check column to the right if this is not the last column
+        if(column < 8) {
+            // get the spot below and to the right
+            var spot = getSpot(minefield, row + 1, column + 1);
+            if(spot.content == "mine") {
+                mineCount++;
+            }
+        }
+    }
+    
+    if(mineCount > 0) {
+        thisSpot.content = mineCount;
+		thisSpot.bkp = mineCount;
+    }
+}
+
+function getSpot(minefield, row, column) {
+	
+    return minefield.rows[row].spots[column];
+	
+}
+function placeRandomMine(minefield) {
+    var row = Math.round(Math.random() * 8);
+    var column = Math.round(Math.random() * 8);
+	var spot = getSpot(minefield, row, column);
+	if(spot.content != "mine")
+	{	spot.content = "mine";
+		spot.bkp="mine";
+	}
+	else
+		placeRandomMine(minefield);
+}
+function placeManyRandomMines(minefield) {
+    for(var i = 0; i < 10; i++) {
+        placeRandomMine(minefield);
+    }
+}
+
+
+function createMinefield() {
+    var minefield = {};
+    minefield.rows = [];
+    
+    for(var i = 0; i < 9; i++) {
+        var row = {};
+        row.spots = [];
+        
+        for(var j = 0; j < 9; j++) {
+            var spot = {};
+            spot.isCovered = true;
+			spot.content = 'empty';
+			//spot.bkp --> to handle the count if actually flagged mine
+			spot.bkp = 'empty';
+			spot.row = i;
+			spot.column = j;
+            row.spots.push(spot);
+        }
+        
+        minefield.rows.push(row);
+		
+    }
+	placeManyRandomMines(minefield)
+	calculateAllNumbers(minefield)
+    return minefield;
+}
+
+function isNumber(n){
+return (!isNaN(parseInt(n)));
+}
